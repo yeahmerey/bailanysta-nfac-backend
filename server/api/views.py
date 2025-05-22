@@ -3,10 +3,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status , permissions 
 from django.contrib.auth.models import User
-from api.serializers import PostSerializer, RegisterSerializer
+from api.serializers import CommentSerializer, PostSerializer, RegisterSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from api.models import Post
+from api.models import Comment, Post
 from api.permissions import IsAuthorOrReadOnly
 
 class RegisterView(APIView):
@@ -104,3 +104,48 @@ class UnlikePostView(APIView):
 
         post.likes.remove(request.user)
         return Response({'detail': 'Post unliked.'}, status=status.HTTP_200_OK)
+    
+
+class PostCommentsView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request, post_id):
+        post = get_object_or_404(Post, id=post_id)
+        comments = post.comments.all().order_by('-created_at')
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, post_id):
+        post = get_object_or_404(Post, id=post_id)
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(post=post, author=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
+
+    def get_object(self, post_id, comment_id):
+        comment = get_object_or_404(Comment, id=comment_id, post_id=post_id)
+        return comment
+
+    def get(self, request, post_id, comment_id):
+        comment = self.get_object(post_id, comment_id)
+        serializer = CommentSerializer(comment)
+        return Response(serializer.data)
+
+    def put(self, request, post_id, comment_id):
+        comment = self.get_object(post_id, comment_id)
+        self.check_object_permissions(request, comment)
+        serializer = CommentSerializer(comment, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, post_id, comment_id):
+        comment = self.get_object(post_id, comment_id)
+        self.check_object_permissions(request, comment)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 
-from api.models import Post
+from api.models import Comment, Post
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True)
@@ -47,4 +47,12 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_like_count(self, obj):
         return obj.likes.count()
+    
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source='author.username')
+    
+    class Meta:
+        model = Comment
+        fields = ['id', 'post', 'author', 'content', 'created_at']
+        read_only_fields = ['author', 'created_at' , 'post']
     
